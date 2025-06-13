@@ -22,15 +22,18 @@ pip install biopython>=1.81
 
 ## 使用方法
 
-1. **准备数据文件夹**
+1. **批量重命名并分拣（推荐）**
 
-   - 将正向测序文件（如 `*_F.ab1` 或 `*_F.fasta`）放入一个文件夹（如 `forward/`）
-   - 将反向测序文件（如 `*_R.ab1` 或 `*_R.fasta`）放入另一个文件夹（如 `reverse/`）
-
-2. **运行脚本**
+   - 直接运行 `rename_ab1_files.py`，会自动将正向文件（如 `*_F.ab1` 或 `*_F.fasta`）移动到 `forward/`，反向文件（如 `*_R.ab1` 或 `*_R.fasta`）移动到 `reverse/`，无需手动分拣。
 
    ```bash
-   python sequence_assembly.py --forward_dir ./forward --reverse_dir ./reverse --output_dir ./assembled --file_type .ab1
+   python rename_ab1_files.py --dir ./seqfiles
+   ```
+
+2. **运行拼接脚本**
+
+   ```bash
+   python sequence_assembly.py --forward_dir ./seqfiles/forward --reverse_dir ./seqfiles/reverse --output_dir ./assembled --file_type .fasta
    ```
 
    - `--forward_dir`：正向测序文件目录
