@@ -75,7 +75,7 @@ python rename_seq_files.py --dir ./seqfiles
 
    ```bash
    # python sequence_assembly.py -h 查看帮助文档
-   python sequence_assembly.py --forward_dir ./seqfiles/forward --reverse_dir ./seqfiles/reverse --output_dir ./assembled --file_type .fasta
+   python sequence_assembly.py --forward_dir ./forward --reverse_dir ./reverse --output_dir ./assembled --file_type .fasta
    ```
 
    - `--forward_dir`：正向测序文件目录
