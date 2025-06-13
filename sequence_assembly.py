@@ -169,17 +169,16 @@ def main():
     print('正向文件提取到的样本名:')
     for f in forward_files:
         basename = os.path.basename(f)
-        # 提取下划线前的样本名
-        if basename.lower().endswith('_f.ab1'):
-            sample = basename.split('_')[0].strip()
+        if basename.lower().endswith('_f.ab1') or basename.lower().endswith('_f.fasta'):
+            sample = basename.rsplit('_F.', 1)[0].strip()
             print(f'  {basename} -> "{sample}"')
             forward_dict[sample] = f
     reverse_dict = {}
     print('反向文件提取到的样本名:')
     for r in reverse_files:
         basename = os.path.basename(r)
-        if basename.lower().endswith('_r.ab1'):
-            sample = basename.split('_')[0].strip()
+        if basename.lower().endswith('_r.ab1') or basename.lower().endswith('_r.fasta'):
+            sample = basename.rsplit('_R.', 1)[0].strip()
             print(f'  {basename} -> "{sample}"')
             reverse_dict[sample] = r
 
