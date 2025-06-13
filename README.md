@@ -1,4 +1,3 @@
-# SangerSeqAssembler
 # Sanger 双向测序结果自动拼接工具
 
 本项目提供一个基于 Python 的命令行工具，可批量自动拼接细菌16S等双向 Sanger 测序（ab1 或 fasta 文件）结果，极大提升实验数据处理效率。
@@ -15,8 +14,10 @@
 
 建议使用 Python 3.7 及以上版本。
 
+只需安装 biopython：
+
 ```bash
-pip install -r requirements.txt
+pip install biopython>=1.81
 ```
 
 ## 使用方法
