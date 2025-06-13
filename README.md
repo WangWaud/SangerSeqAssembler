@@ -24,10 +24,10 @@ pip install biopython>=1.81
 
 1. **批量重命名并分拣（推荐）**
 
-   - 直接运行 `rename_ab1_files.py`，会自动将正向文件（如 `*_F.ab1` 或 `*_F.fasta`）移动到 `forward/`，反向文件（如 `*_R.ab1` 或 `*_R.fasta`）移动到 `reverse/`，无需手动分拣。
+   - 直接运行 `rename_seq_files.py`，会自动将正向文件（如 `*_F.ab1` 或 `*_F.fasta`）移动到 `forward/`，反向文件（如 `*_R.ab1` 或 `*_R.fasta`）移动到 `reverse/`，无需手动分拣。
 
    ```bash
-   python rename_ab1_files.py --dir ./seqfiles
+   python rename_seq_files.py --dir ./seqfiles
    ```
 
 2. **运行拼接脚本**
@@ -78,12 +78,12 @@ ATGCCG...
 
 ## 批量重命名脚本（可选）
 
-如果你的测序文件名为测序公司常见格式（如生工： `编号_..._(样本名)_[引物名].ab1` 或 `.fasta`），可使用本项目自带的 `rename_ab1_files.py` 脚本批量重命名为自动拼接所需格式。
+如果你的测序文件名为测序公司常见格式（如生工： `编号_..._(样本名)_[引物名].ab1` 或 `.fasta`），可使用本项目自带的 `rename_seq_files.py` 脚本批量重命名为自动拼接所需格式。
 
 **用法示例：**
 
 ```bash
-python rename_ab1_files.py --dir ./seqfiles
+python rename_seq_files.py --dir ./seqfiles
 ```
 
 - `--dir`：需要重命名的 ab1 或 fasta 文件所在目录，默认当前目录
@@ -97,16 +97,17 @@ python rename_ab1_files.py --dir ./seqfiles
 **命令行帮助文档：**
 
 ```text
-批量重命名Sanger测序公司返回的ab1或fasta文件，便于自动拼接。
+批量重命名并分拣Sanger测序公司返回的ab1或fasta文件，便于自动拼接。
 
 本脚本会将形如：
   编号_..._(样本名)_[引物名].ab1 或 .fasta
 自动重命名为：
   样本名_F.ab1 / 样本名_F.fasta（正向，27F）
   样本名_R.ab1 / 样本名_R.fasta（反向，1492R）
+并自动将正向文件移动到forward/，反向文件移动到reverse/。
 
 用法示例：
-  python rename_ab1_files.py --dir ./seqfiles
+  python rename_seq_files.py --dir ./seqfiles
 
 参数说明：
   --dir    需要重命名的ab1或fasta文件所在目录，默认当前目录
