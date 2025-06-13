@@ -8,7 +8,6 @@
 - 自动识别正向/反向文件并配对
 - 自动寻找重叠区并拼接，输出高质量的拼接序列
 - 输出拼接质量指标（Overlap、Score）
-- 详细命令行帮助文档
 
 ## 安装依赖
 
@@ -22,81 +21,34 @@ pip install biopython>=1.81
 
 ## 使用方法
 
-1. **批量重命名并分拣（推荐）**
+**1. 样本重命名**
 
-   - 直接运行 `rename_seq_files.py`，会自动将正向文件（如 `*_F.ab1` 或 `*_F.fasta`）移动到 `forward/`，反向文件（如 `*_R.ab1` 或 `*_R.fasta`）移动到 `reverse/`，无需手动分拣。
+在使用拼接脚本前，你需要确保正向和反向文件的命名规范一致。你可以选择**手动重命名**或使用本项目自带的**批量重命名脚本**：
 
-   ```bash
-   python rename_seq_files.py --dir ./seqfiles
-   ```
+### 方式一：手动重命名
 
-2. **运行拼接脚本**
+- 将正向文件命名为 `样本名_F.ab1` 或 `样本名_F.fasta`
+- 将反向文件命名为 `样本名_R.ab1` 或 `样本名_R.fasta`
+- "样本名"部分需正反向一致
+- 手动将正向文件放入 `forward/`，反向文件放入 `reverse/`
 
-   ```bash
-   python sequence_assembly.py --forward_dir ./seqfiles/forward --reverse_dir ./seqfiles/reverse --output_dir ./assembled --file_type .fasta
-   ```
+### 方式二：批量重命名并分拣（推荐）
 
-   - `--forward_dir`：正向测序文件目录
-   - `--reverse_dir`：反向测序文件目录
-   - `--output_dir`：拼接结果输出目录
-   - `--file_type`：输入文件类型，支持 `.ab1` 或 `.fasta`，默认 `.fasta`
-
-3. **查看帮助文档**
-
-   ```bash
-   python sequence_assembly.py -h
-   ```
-
-## 文件命名要求
-
-- 正向文件：`样本名_F.ab1` 或 `样本名_F.fasta`
-- 反向文件：`样本名_R.ab1` 或 `样本名_R.fasta`
-- "样本名"部分需正反向一致，脚本会自动配对
-- **示例：**
-  - `1_F.ab1` 和 `1_R.ab1`（样本名为 `1`）
-  - `A12_F.ab1` 和 `A12_R.ab1`（样本名为 `A12`）
-  - `sampleX_F.fasta` 和 `sampleX_R.fasta`（样本名为 `sampleX`）
-
-## 输出说明
-
-- 拼接结果以 `样本名_assembled.fasta` 命名，保存在输出目录
-- 每条序列的描述信息包含：
-  - **Overlap**：正向序列和反向互补序列之间的重叠碱基数，重叠越长拼接越可靠
-  - **Score**：重叠区域的比对得分，反映重叠区的相似度，得分越高说明拼接越可靠
-
-## 典型输出示例
-
-```text
->1_assembled Overlap: 120, Score: 115.0
-ATGCCG...
-```
-
-## 适用场景
-
-- 细菌16S rDNA全长测序拼接
-- 其他需要双向 Sanger 测序拼接的生物信息学场景
-
-## 批量重命名脚本（可选）
-
-如果你的测序文件名为测序公司常见格式（如生工： `编号_..._(样本名)_[引物名].ab1` 或 `.fasta`），可使用本项目自带的 `rename_seq_files.py` 脚本批量重命名为自动拼接所需格式。
-
-**用法示例：**
+- 直接运行 `rename_seq_files.py`，会自动将正向文件（如 `*_F.ab1` 或 `*_F.fasta`）移动到 `forward/`，反向文件（如 `*_R.ab1` 或 `*_R.fasta`）移动到 `reverse/`，无需手动分拣。
 
 ```bash
+# python rename_seq_files.py -h 查看帮助文档
 python rename_seq_files.py --dir ./seqfiles
 ```
+- `--dir`：需要重命名和分拣的 ab1 或 fasta 文件所在目录，默认当前目录
 
-- `--dir`：需要重命名的 ab1 或 fasta 文件所在目录，默认当前目录
-
-重命名后，正向文件为 `样本名_F.ab1` 或 `样本名_F.fasta`，反向文件为 `样本名_R.ab1` 或 `样本名_R.fasta`，便于后续自动拼接。
-
-**命名示例：**
+命名示例：
 - 输入：`0001_31425061200565_(A12)_[27F].ab1` 和 `0001_31425061200565_(A12)_[1492R].fasta`
-- 输出：`A12_F.ab1` 和 `A12_R.fasta`
+- 输出：`forward/A12_F.ab1` 和 `reverse/A12_R.fasta`
 
-**命令行帮助文档：**
+**rename_seq_files.py 帮助文档：**
 
-```text
+```python
 批量重命名并分拣Sanger测序公司返回的ab1或fasta文件，便于自动拼接。
 
 本脚本会将形如：
@@ -110,11 +62,39 @@ python rename_seq_files.py --dir ./seqfiles
   python rename_seq_files.py --dir ./seqfiles
 
 参数说明：
-  --dir    需要重命名的ab1或fasta文件所在目录，默认当前目录
+  --dir    需要重命名和分拣的ab1或fasta文件所在目录，默认当前目录
 
 命名示例：
   输入：0001_31425061200565_(A12)_[27F].ab1 和 0001_31425061200565_(A12)_[1492R].fasta
-  输出：A12_F.ab1 和 A12_R.fasta
+  输出：forward/A12_F.ab1 和 reverse/A12_R.fasta
+```
+
+---
+
+**2. 运行拼接脚本**
+
+   ```bash
+   # python sequence_assembly.py -h 查看帮助文档
+   python sequence_assembly.py --forward_dir ./seqfiles/forward --reverse_dir ./seqfiles/reverse --output_dir ./assembled --file_type .fasta
+   ```
+
+   - `--forward_dir`：正向测序文件目录
+   - `--reverse_dir`：反向测序文件目录
+   - `--output_dir`：拼接结果输出目录
+   - `--file_type`：输入文件类型，支持 `.ab1` 或 `.fasta`，默认 `.fasta`
+
+## 输出说明
+
+- 拼接结果以 `样本名_assembled.fasta` 命名，保存在输出目录
+- 每条序列的描述信息包含：
+  - **Overlap**：正向序列和反向互补序列之间的重叠碱基数，重叠越长拼接越可靠
+  - **Score**：重叠区域的比对得分，反映重叠区的相似度，得分越高说明拼接越可靠
+
+## 典型输出示例
+
+```text
+>1_assembled Overlap: 120, Score: 115.0
+ATGCCG...
 ```
 
 ## 贡献与反馈
