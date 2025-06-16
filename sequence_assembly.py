@@ -8,6 +8,7 @@ from Bio.SeqRecord import SeqRecord
 from Bio.Align import PairwiseAligner
 import argparse
 import shutil
+from collections import Counter
 
 def convert_ab1_to_fasta(ab1_file, output_dir):
     """
@@ -28,70 +29,125 @@ def convert_ab1_to_fasta(ab1_file, output_dir):
         print(f"转换文件 {ab1_file} 时出错: {str(e)}")
         return None
 
-def find_overlap(seq1, seq2, min_overlap=20):
-    """
-    寻找两个序列之间的重叠区域
-    """
+def find_overlap(seq1, seq2, min_overlap=40, min_score=900, debug=False):
     aligner = PairwiseAligner()
     aligner.mode = 'local'
-    aligner.match_score = 1.0
-    aligner.mismatch_score = -1.0
-    aligner.open_gap_score = -1.0
-    aligner.extend_gap_score = -0.5
-    
-    # 尝试不同的重叠长度
-    for overlap in range(min(len(seq1), len(seq2)), min_overlap, -1):
-        # 检查seq1的末端与seq2的开头
-        alignment = aligner.align(seq1[-overlap:], seq2[:overlap])
-        if alignment.score > 0.8 * overlap:  # 80%的匹配率
-            return overlap, alignment.score
-    
+    aligner.match_score = 2.0
+    aligner.mismatch_score = -5.0
+    aligner.open_gap_score = -6.0
+    aligner.extend_gap_score = -6.0
+
+    best = (0, 0, 0)  # overlap, identity, score
+    for overlap in range(min(len(seq1), len(seq2)), min_overlap - 1, -1):
+        alignment = aligner.align(seq1[-overlap:], seq2[:overlap])[0]
+        seqA = str(seq1[-overlap:])
+        seqB = str(seq2[:overlap])
+        matches = sum((a == b) and (a != '-') and (b != '-') for a, b in zip(seqA, seqB))
+        identity = matches / overlap
+        if alignment.score >= min_score and overlap >= min_overlap:
+            if alignment.score > best[2]:
+                best = (overlap, identity, alignment.score)
+        if identity > best[1] or (identity == best[1] and alignment.score > best[2]):
+            best = (overlap, identity, alignment.score)
+    if best[2] >= min_score and best[0] >= min_overlap:
+        if debug:
+            print(f"  选用最佳重叠: overlap={best[0]}, identity={best[1]:.2f}, score={best[2]}")
+        return best[0], best[2]
+    if debug:
+        print(f"  未找到满足条件的重叠，最佳尝试：overlap={best[0]}, identity={best[1]:.2f}, score={best[2]}")
     return 0, 0
 
 def assemble_sequences(forward_seq, reverse_seq):
     """
-    拼接正向和反向序列
+    拼接正向和反向序列，使用Cap3参数标准
     """
-    # 将反向序列转换为反向互补
     reverse_complement = reverse_seq.reverse_complement()
-    
-    # 寻找重叠区域
     overlap, score = find_overlap(forward_seq, reverse_complement)
-    
     if overlap > 0:
-        # 拼接序列
         assembled_seq = forward_seq[:-overlap] + reverse_complement
         return assembled_seq, overlap, score
     else:
         return None, 0, 0
 
+def quality_trim(record, min_window=20, min_q=10):
+    """
+    动态加权质量裁剪：找到首尾连续min_window个碱基Q>=min_q的区段，保留中间高质量区
+    """
+    seq = str(record.seq)
+    quals = record.letter_annotations['phred_quality']
+    n = len(seq)
+    # 找5'端
+    start = 0
+    for i in range(n - min_window + 1):
+        if min(quals[i:i+min_window]) >= min_q:
+            start = i
+            break
+    # 找3'端
+    end = n
+    for j in range(n, min_window-1, -1):
+        if min(quals[j-min_window:j]) >= min_q:
+            end = j
+            break
+    return seq[start:end], quals[start:end]
+
+def consensus_by_quality(seq1, qual1, seq2, qual2):
+    """
+    重叠区质量加权共识，仿CAP3论文
+    """
+    consensus = []
+    for b1, q1, b2, q2 in zip(seq1, qual1, seq2, qual2):
+        if q1 > q2:
+            consensus.append(b1)
+        else:
+            consensus.append(b2)
+    return ''.join(consensus)
+
 def process_file_pair(forward_file, reverse_file, output_dir, sample=None):
     """
-    处理一对正向和反向测序文件
+    处理一对正向和反向测序文件，支持ab1动态加权裁剪和重叠区质量共识
     """
-    # 判断文件类型
+    # 读取正向
     if forward_file.lower().endswith('.ab1'):
-        forward_seq = SeqIO.read(forward_file, "abi").seq
+        f_record = SeqIO.read(forward_file, "abi")
+        f_seq, f_qual = quality_trim(f_record)
+        f_seq = Seq(f_seq)
     else:
-        forward_seq = SeqIO.read(forward_file, "fasta").seq
+        f_seq = SeqIO.read(forward_file, "fasta").seq
+        f_qual = [40]*len(f_seq)  # 假定fasta为高质量
+    # 读取反向
     if reverse_file.lower().endswith('.ab1'):
-        reverse_seq = SeqIO.read(reverse_file, "abi").seq
+        r_record = SeqIO.read(reverse_file, "abi")
+        r_seq, r_qual = quality_trim(r_record)
+        r_seq = Seq(r_seq)
     else:
-        reverse_seq = SeqIO.read(reverse_file, "fasta").seq
-    # 拼接序列
-    assembled_seq, overlap, score = assemble_sequences(forward_seq, reverse_seq)
-    if assembled_seq:
-        # 创建输出文件名
+        r_seq = SeqIO.read(reverse_file, "fasta").seq
+        r_qual = [40]*len(r_seq)
+    # 反向互补
+    r_seq_rc = r_seq.reverse_complement()
+    r_qual_rc = r_qual[::-1]  # 质量值也反转
+    # 找重叠
+    overlap, score = find_overlap(f_seq, r_seq_rc, debug=False)
+    if overlap > 0:
+        # 重叠区共识
+        f_overlap_seq = f_seq[-overlap:]
+        f_overlap_qual = f_qual[-overlap:]
+        r_overlap_seq = r_seq_rc[:overlap]
+        r_overlap_qual = r_qual_rc[:overlap]
+        consensus_overlap = consensus_by_quality(f_overlap_seq, f_overlap_qual, r_overlap_seq, r_overlap_qual)
+        assembled_seq = f_seq[:-overlap] + Seq(consensus_overlap) + r_seq_rc[overlap:]
+        # 输出
         if sample is not None:
             output_file = os.path.join(output_dir, f"{sample}_assembled.fasta")
         else:
             base_name = os.path.splitext(os.path.basename(forward_file))[0]
             output_file = os.path.join(output_dir, f"{base_name}_assembled.fasta")
-        # 保存拼接结果
         record = SeqRecord(assembled_seq, id=f"{sample}_assembled" if sample else f"{base_name}_assembled", description=f"Overlap: {overlap}, Score: {score}")
         SeqIO.write(record, output_file, "fasta")
         return True, output_file
     else:
+        # 只在失败时输出详细调试
+        find_overlap(f_seq, r_seq_rc, debug=True)
+        print(f"样本{sample}拼接失败，未找到满足条件的重叠区。\n")
         return False, None
 
 def process_directory(input_dir, output_dir, file_type):
@@ -133,8 +189,8 @@ def main():
   python sequence_assembly.py --forward_dir ./forward --reverse_dir ./reverse --output_dir ./assembled --file_type .ab1
 
 参数说明：
-  --forward_dir   正向测序文件目录（如 *_F.ab1 或 *_F.fasta）
-  --reverse_dir   反向测序文件目录（如 *_R.ab1 或 *_R.fasta）
+  --forward_dir   正向测序文件目录（如 *_F.ab1 或 *_F.fasta），默认 ./forward
+  --reverse_dir   反向测序文件目录（如 *_R.ab1 或 *_R.fasta），默认 ./reverse
   --output_dir    拼接结果输出目录
   --file_type     输入文件类型，支持 .ab1 或 .fasta，默认 .fasta
 
@@ -150,8 +206,8 @@ def main():
 ''',
         formatter_class=argparse.RawTextHelpFormatter
     )
-    parser.add_argument('--forward_dir', required=True, help='正向测序文件目录（如 *_F.ab1 或 *_F.fasta）')
-    parser.add_argument('--reverse_dir', required=True, help='反向测序文件目录（如 *_R.ab1 或 *_R.fasta）')
+    parser.add_argument('--forward_dir', default='./forward', help='正向测序文件目录（如 *_F.ab1 或 *_F.fasta），默认 ./forward')
+    parser.add_argument('--reverse_dir', default='./reverse', help='反向测序文件目录（如 *_R.ab1 或 *_R.fasta），默认 ./reverse')
     parser.add_argument('--output_dir', required=True, help='拼接结果输出目录')
     parser.add_argument('--file_type', choices=['.ab1', '.fasta'], default='.fasta',
                       help='输入文件类型，支持 .ab1 或 .fasta，默认 .fasta')
